@@ -20,7 +20,6 @@ app.use(express.static('public'));
 app.use(cors());
 
 // Serve the main HTML file for ALL routes (client-side routing)
-// This fixes the "Cannot GET /room/97e1057c" error
 app.get('*', (req, res) => {
   res.sendFile(__dirname + '/public/index.html');
 });
@@ -90,9 +89,6 @@ async function translateText(text, sourceLang, targetLang) {
 // Socket connection handling
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
-  
-  // Store the rooms this socket is in
-  let socketRooms = new Set();
 
   // Create a new chat room
   socket.on('create-room', (data) => {
@@ -113,7 +109,8 @@ io.on('connection', (socket) => {
         language: userLanguage,
         joinedAt: new Date()
       }],
-      partnerLanguage: partnerLanguage, // Store partner's language
+      creatorLanguage: userLanguage,      // Store creator's language
+      partnerLanguage: partnerLanguage,    // Store partner's language
       createdAt: new Date(),
       timeout: setTimeout(() => {
         // Delete room after timeout if not full
@@ -126,14 +123,31 @@ io.on('connection', (socket) => {
 
     // Join the room
     socket.join(roomId);
-    socketRooms.add(roomId);
     
     // Send room info to creator
     socket.emit('room-created', {
-      roomId
+      roomId,
+      creatorLanguage: userLanguage,
+      partnerLanguage: partnerLanguage
     });
     
-    console.log(`Room created: ${roomId} with user language: ${userLanguage}, partner language: ${partnerLanguage}`);
+    console.log(`Room created: ${roomId} with creator language: ${userLanguage}, partner language: ${partnerLanguage}`);
+  });
+
+  // Get room info for joiners
+  socket.on('get-room-info', (data) => {
+    const { roomId } = data;
+    
+    // Check if room exists
+    if (rooms.has(roomId)) {
+      const room = rooms.get(roomId);
+      
+      // Send room language info to joiner
+      socket.emit('room-info', {
+        creatorLanguage: room.creatorLanguage,
+        partnerLanguage: room.partnerLanguage
+      });
+    }
   });
 
   // Join an existing room
@@ -167,7 +181,6 @@ io.on('connection', (socket) => {
     
     // Join the room
     socket.join(roomId);
-    socketRooms.add(roomId);
     
     // Notify other participant
     const otherParticipant = room.participants.find(p => p.id !== socket.id);

@@ -27,6 +27,7 @@ let userLanguage = 'en';
 let partnerLanguage = 'ar';
 let timeLeft = 300; // 5 minutes in seconds
 let timer = null;
+let isJoiningRoom = false;
 
 // Language names mapping
 const languageNames = {
@@ -58,7 +59,11 @@ languageOptionsPartner.forEach(option => {
 // Start chat button
 startBtn.addEventListener('click', function() {
     username = usernameInput.value.trim() || 'User';
-    startChat();
+    if (isJoiningRoom) {
+        joinExistingRoom();
+    } else {
+        startChat();
+    }
 });
 
 // End chat button
@@ -120,6 +125,24 @@ function startChat() {
     });
 }
 
+// Function to join existing room
+function joinExistingRoom() {
+    // Hide setup, show room container
+    setupContainer.style.display = 'none';
+    roomContainer.style.display = 'block';
+    
+    const path = window.location.pathname;
+    const roomMatch = path.match(/\/room\/([a-zA-Z0-9]+)/);
+    
+    if (roomMatch) {
+        socket.emit('join-room', {
+            roomId: roomMatch[1],
+            username: username,
+            language: userLanguage // This should be the partner's language
+        });
+    }
+}
+
 // Function to end chat
 function endChat(reason = 'ended') {
     // Notify server that chat is ending
@@ -130,33 +153,10 @@ function endChat(reason = 'ended') {
     }
 }
 
-// Function to return to setup (called when chat ends)
-function returnToSetup() {
-    // Reset everything and go back to setup
-    currentRoomId = null;
-    chatContainer.style.display = 'none';
-    setupContainer.style.display = 'block';
-    
-    // Clear messages
-    messagesContainer.innerHTML = '';
-    
-    // Reset language selections to defaults
-    languageOptions.forEach(opt => opt.classList.remove('active'));
-    languageOptionsPartner.forEach(opt => opt.classList.remove('active'));
-    document.querySelector('.language-option[data-lang="en"]').classList.add('active');
-    document.querySelector('.language-option-partner[data-lang="ar"]').classList.add('active');
-    userLanguage = 'en';
-    partnerLanguage = 'ar';
-    translationLang.textContent = 'Arabic';
-    
-    // Reset timer
-    if (timer) {
-        clearInterval(timer);
-        timer = null;
-    }
-    
-    // Reset username
-    usernameInput.value = username;
+// Function to redirect to homepage (as if visiting for first time)
+function redirectToHomepage() {
+    // Redirect to root path
+    window.location.href = '/';
 }
 
 // Function to send message
@@ -183,7 +183,7 @@ function addMessage(message, translatedMessage, username, isOwn) {
     messageDiv.innerHTML = `
         <div class="original-text">${message}</div>
         <div class="translated-text">${translatedMessage}</div>
-        <div class="message-time">${timeString}</div>
+        <div class="message-time">${timeString} ${isOwn ? '' : '(' + username + ')'}</div>
     `;
     
     messagesContainer.appendChild(messageDiv);
@@ -229,6 +229,29 @@ function startTimer() {
     }, 1000);
 }
 
+// Function to automatically select partner language
+function autoSelectPartnerLanguage(creatorLanguage, partnerLanguage) {
+    console.log('Auto-selecting languages:', creatorLanguage, partnerLanguage);
+    
+    // Clear all active selections
+    languageOptions.forEach(opt => opt.classList.remove('active'));
+    languageOptionsPartner.forEach(opt => opt.classList.remove('active'));
+    
+    // Select partner's language as user's language (for joiner)
+    const userOption = document.querySelector(`.language-option[data-lang="${partnerLanguage}"]`);
+    if (userOption) {
+        userOption.classList.add('active');
+        userLanguage = partnerLanguage;
+    }
+    
+    // Select creator's language as partner's language
+    const partnerOption = document.querySelector(`.language-option-partner[data-lang="${creatorLanguage}"]`);
+    if (partnerOption) {
+        partnerOption.classList.add('active');
+        translationLang.textContent = languageNames[creatorLanguage] || creatorLanguage;
+    }
+}
+
 // Socket event listeners
 socket.on('room-created', (data) => {
     currentRoomId = data.roomId;
@@ -243,6 +266,7 @@ socket.on('room-created', (data) => {
 
 socket.on('joined-room', (data) => {
     currentRoomId = data.roomId;
+    
     if (data.otherUser) {
         partnerName.textContent = data.otherUser.username;
         partnerLanguage = data.otherUser.language;
@@ -285,7 +309,7 @@ socket.on('message-received', (data) => {
 
 socket.on('room-expired', () => {
     alert('The chat room has expired. Please create a new room.');
-    returnToSetup();
+    redirectToHomepage();
 });
 
 socket.on('user-left', (data) => {
@@ -296,13 +320,13 @@ socket.on('chat-ended', (data) => {
     addSystemMessage(`${data.username} has ended the chat. The room is now closed.`);
     setTimeout(() => {
         alert(`${data.username} has ended the chat. You will be returned to the setup screen.`);
-        returnToSetup();
+        redirectToHomepage();
     }, 2000);
 });
 
 socket.on('return-to-setup', () => {
     // This is sent to the user who ended the chat
-    returnToSetup();
+    redirectToHomepage();
 });
 
 socket.on('error', (data) => {
@@ -316,25 +340,29 @@ window.addEventListener('DOMContentLoaded', () => {
     
     if (roomMatch) {
         // Someone is joining an existing room
+        isJoiningRoom = true;
+        
         // Show setup for joiner but with different flow
         setupContainer.style.display = 'block';
         document.querySelector('.setup-title').textContent = 'Join Chat Room';
         document.querySelector('.start-btn').innerHTML = '<i class="fas fa-sign-in-alt"></i> Join Room';
         
-        startBtn.addEventListener('click', function() {
-            username = usernameInput.value.trim() || 'User';
-            setupContainer.style.display = 'none';
-            roomContainer.style.display = 'block';
-            
-            socket.emit('join-room', {
-                roomId: roomMatch[1],
-                username: username,
-                language: userLanguage // User's language for this session
-            });
+        // Request room info to get language preferences
+        socket.emit('get-room-info', {
+            roomId: roomMatch[1]
         });
     } else {
         // First visitor - show setup
         setupContainer.style.display = 'block';
+        isJoiningRoom = false;
+    }
+});
+
+// Handle getting room info for joiners
+socket.on('room-info', (data) => {
+    if (data.creatorLanguage && data.partnerLanguage) {
+        console.log('Received room info:', data);
+        autoSelectPartnerLanguage(data.creatorLanguage, data.partnerLanguage);
     }
 });
 
