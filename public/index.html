@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bridge Chat - Real-time Translation Chat</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-bridge"></i> Bridge Chat</h1>
+            <p>Real-time translation chat between two people</p>
+        </div>
+        
+        <div class="content">
+            <div class="setup-container" id="setup-container">
+                <h2 class="setup-title">Setup Your Chat</h2>
+                <div class="setup-form">
+                    <div class="form-group">
+                        <label for="username">Your Name:</label>
+                        <input type="text" id="username" placeholder="e.g John">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Your Language:</label>
+                        <div class="language-selector">
+                            <div class="language-option active" data-lang="en">English</div>
+                            <div class="language-option" data-lang="ar">Arabic</div>
+                            <div class="language-option" data-lang="es">Spanish</div>
+                            <div class="language-option" data-lang="fr">French</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Partner's Language:</label>
+                        <div class="language-selector">
+                            <div class="language-option-partner active" data-lang="ar">Arabic</div>
+                            <div class="language-option-partner" data-lang="en">English</div>
+                            <div class="language-option-partner" data-lang="es">Spanish</div>
+                            <div class="language-option-partner" data-lang="fr">French</div>
+                        </div>
+                    </div>
+                    
+                    <button class="start-btn" id="start-btn">
+                        <i class="fas fa-comments"></i> Start Chat
+                    </button>
+                </div>
+                
+               
+            </div>
+            
+            <div class="room-container" id="room-container">
+                <h2 class="room-title">Share This Link</h2>
+                <div class="room-link">
+                    <div class="link-display" id="room-link">https://bridgechat.app/room/xyz123</div>
+                    <button class="copy-btn" id="copy-btn">
+                        <i class="fas fa-copy"></i> Copy Link
+                    </button>
+                </div>
+                <div class="status waiting" id="status">
+                    <i class="fas fa-clock"></i> Waiting for partner... (Room expires in <span id="timer">5:00</span>)
+                </div>
+            </div>
+            
+            <div class="chat-container" id="chat-container">
+                <div class="chat-header">
+                    <div class="chat-header-info">
+                        <div class="chat-header-name" id="partner-name">Partner</div>
+                        <div class="chat-header-status">Online - Translating to <span id="translation-lang">Arabic</span></div>
+                    </div>
+                    <div class="chat-header-icons">
+                        <button class="end-chat-btn" id="end-chat-btn">
+                            <i class="fas fa-sign-out-alt"></i> End Chat
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="messages" id="messages-container">
+                    <!-- Messages will be added here dynamically -->
+                </div>
+                
+                <div class="message-input-area">
+                    <input type="text" class="message-input" id="message-input" placeholder="Type your message...">
+                    <button class="send-button" id="send-button">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer with Legal Links -->
+        <footer class="main-footer">
+            <div class="footer-content">
+                <!-- <div class="footer-links">
+                    <a href="/privacy">Privacy Policy</a>
+                    <a href="/terms">Terms of Service</a>
+                    <a href="/faq">FAQ</a>
+                    <a href="/about">About</a>
+                </div> -->
+                <div class="footer-info">
+                    <p>&copy; <script>document.write(new Date().getFullYear())</script> Bridge Chat. Connecting people across language barriers.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/script.js"></script>
+</body>
+</html>
