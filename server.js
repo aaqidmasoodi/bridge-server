@@ -1,0 +1,314 @@
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const { v4: uuidv4 } = require('uuid');
+const cors = require('cors');
+const axios = require('axios');
+require('dotenv').config();
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Serve static files from public directory
+app.use(express.static('public'));
+app.use(cors());
+
+// Serve the main HTML file for ALL routes (client-side routing)
+// This fixes the "Cannot GET /room/97e1057c" error
+app.get('*', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
+// Store active rooms and their participants
+const rooms = new Map();
+
+// Room cleanup timer (5 minutes)
+const ROOM_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+// Function to translate text using Groq API
+async function translateText(text, sourceLang, targetLang) {
+  try {
+    // Only proceed if we have an API key
+    if (!process.env.GROQ_API_KEY) {
+      console.warn('No GROQ_API_KEY found, returning original text');
+      return text;
+    }
+    
+    // Map language codes to language names
+    const languageMap = {
+      'en': 'English',
+      'ar': 'Arabic',
+      'es': 'Spanish',
+      'fr': 'French'
+    };
+    
+    const sourceLangName = languageMap[sourceLang] || 'English';
+    const targetLangName = languageMap[targetLang] || 'Arabic';
+    
+    // Create prompt for translation
+    const prompt = `Translate the following text from ${sourceLangName} to ${targetLangName}. Only provide the translation, nothing else:\n\n"${text}"`;
+    
+    console.log(`Translating: ${text} from ${sourceLangName} to ${targetLangName}`);
+    
+    // Call Groq API
+    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      model: "llama3-8b-8192",
+      temperature: 0.3,
+      max_tokens: 1024,
+      top_p: 1,
+      stream: false,
+      stop: null
+    }, {
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // Extract translated text
+    const translatedText = response.data.choices[0].message.content.trim();
+    console.log(`Translation result: ${translatedText}`);
+    return translatedText;
+  } catch (error) {
+    console.error('Translation error:', error.response?.data || error.message);
+    return text; // Return original text if translation fails
+  }
+}
+
+// Socket connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  
+  // Store the rooms this socket is in
+  let socketRooms = new Set();
+
+  // Create a new chat room
+  socket.on('create-room', (data) => {
+    const { username, userLanguage, partnerLanguage } = data;
+    
+    // Generate a new room ID (8 characters)
+    let roomId;
+    do {
+      roomId = uuidv4().substring(0, 8);
+    } while (rooms.has(roomId)); // Ensure uniqueness
+    
+    // Create room with creator as first participant
+    rooms.set(roomId, {
+      id: roomId,
+      participants: [{
+        id: socket.id,
+        username: username,
+        language: userLanguage,
+        joinedAt: new Date()
+      }],
+      partnerLanguage: partnerLanguage, // Store partner's language
+      createdAt: new Date(),
+      timeout: setTimeout(() => {
+        // Delete room after timeout if not full
+        if (rooms.has(roomId) && rooms.get(roomId).participants.length < 2) {
+          rooms.delete(roomId);
+          io.to(roomId).emit('room-expired');
+        }
+      }, ROOM_TIMEOUT)
+    });
+
+    // Join the room
+    socket.join(roomId);
+    socketRooms.add(roomId);
+    
+    // Send room info to creator
+    socket.emit('room-created', {
+      roomId
+    });
+    
+    console.log(`Room created: ${roomId} with user language: ${userLanguage}, partner language: ${partnerLanguage}`);
+  });
+
+  // Join an existing room
+  socket.on('join-room', (data) => {
+    const { roomId, username, language } = data;
+    
+    // Check if room exists
+    if (!rooms.has(roomId)) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+    
+    const room = rooms.get(roomId);
+    
+    // Check if room is full
+    if (room.participants.length >= 2) {
+      socket.emit('error', { message: 'Room is full' });
+      return;
+    }
+    
+    // Clear timeout since room is now full
+    clearTimeout(room.timeout);
+    
+    // Add participant to room (use the language they specified)
+    room.participants.push({
+      id: socket.id,
+      username: username,
+      language: language,
+      joinedAt: new Date()
+    });
+    
+    // Join the room
+    socket.join(roomId);
+    socketRooms.add(roomId);
+    
+    // Notify other participant
+    const otherParticipant = room.participants.find(p => p.id !== socket.id);
+    if (otherParticipant) {
+      io.to(otherParticipant.id).emit('user-joined', {
+        username: username,
+        language: language
+      });
+    }
+    
+    // Send room info to joiner (include the other user's info)
+    socket.emit('joined-room', {
+      roomId,
+      otherUser: otherParticipant ? {
+        username: otherParticipant.username,
+        language: otherParticipant.language
+      } : null
+    });
+    
+    console.log(`User ${username} joined room: ${roomId} with language: ${language}`);
+  });
+
+  // Handle sending messages
+  socket.on('send-message', async (data) => {
+    const { roomId, message } = data;
+    
+    // Check if room exists
+    if (!rooms.has(roomId)) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+    
+    const room = rooms.get(roomId);
+    const sender = room.participants.find(p => p.id === socket.id);
+    const receiver = room.participants.find(p => p.id !== socket.id);
+    
+    if (!sender || !receiver) {
+      socket.emit('error', { message: 'Participant not found' });
+      return;
+    }
+    
+    console.log(`Translating message from ${sender.language} to ${receiver.language}`);
+    
+    // Translate message from sender's language to receiver's language
+    const translatedMessage = await translateText(
+      message, 
+      sender.language, 
+      receiver.language
+    );
+    
+    // Emit message to sender (show what they sent)
+    socket.emit('message-received', {
+      message,
+      translatedMessage,
+      username: 'You',
+      timestamp: new Date(),
+      isOwn: true
+    });
+    
+    // Emit message to receiver (show translation in their language)
+    io.to(receiver.id).emit('message-received', {
+      message,
+      translatedMessage,
+      username: sender.username,
+      timestamp: new Date(),
+      isOwn: false
+    });
+  });
+
+  // Handle user ending chat intentionally
+  socket.on('end-chat', (data) => {
+    const { roomId } = data;
+    
+    if (!rooms.has(roomId)) {
+      return;
+    }
+    
+    const room = rooms.get(roomId);
+    const participant = room.participants.find(p => p.id === socket.id);
+    
+    if (participant) {
+      // Notify the other participant that this user ended the chat
+      const otherParticipant = room.participants.find(p => p.id !== socket.id);
+      if (otherParticipant) {
+        io.to(otherParticipant.id).emit('chat-ended', {
+          username: participant.username,
+          reason: 'ended'
+        });
+      }
+      
+      // Notify the user who ended the chat to return to setup
+      socket.emit('return-to-setup');
+      
+      // Remove this participant from the room
+      room.participants = room.participants.filter(p => p.id !== socket.id);
+      
+      // If room is now empty, delete it
+      if (room.participants.length === 0) {
+        clearTimeout(room.timeout);
+        rooms.delete(roomId);
+      }
+    }
+    
+    console.log(`User ${participant ? participant.username : 'unknown'} ended chat in room: ${roomId}`);
+  });
+
+  // Handle disconnection (network loss, browser close, etc.)
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+    
+    // Remove user from any rooms they were in
+    for (const [roomId, room] of rooms.entries()) {
+      const participantIndex = room.participants.findIndex(p => p.id === socket.id);
+      
+      if (participantIndex !== -1) {
+        const participant = room.participants[participantIndex];
+        room.participants.splice(participantIndex, 1);
+        
+        // Notify remaining participant that this user left
+        if (room.participants.length > 0) {
+          io.to(room.participants[0].id).emit('user-left', {
+            username: participant.username
+          });
+        }
+        // If room is now empty, delete it
+        else {
+          clearTimeout(room.timeout);
+          rooms.delete(roomId);
+        }
+        
+        console.log(`User ${participant.username} left room: ${roomId}`);
+        break;
+      }
+    }
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  if (!process.env.GROQ_API_KEY) {
+    console.warn('Warning: GROQ_API_KEY not found in environment variables. Translation will not work.');
+  }
+});
