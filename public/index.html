@@ -24,35 +24,67 @@
                     </div>
                     
                     <div class="form-group">
-                        <label>Your Language:</label>
-                        <div class="language-selector">
-                            <div class="language-option active" data-lang="en">English</div>
-                            <div class="language-option" data-lang="ar">Arabic</div>
-                            <div class="language-option" data-lang="es">Spanish</div>
-                            <div class="language-option" data-lang="fr">French</div>
-                        </div>
+                        <label for="user-language">Your Language:</label>
+                        <select id="user-language" class="language-dropdown">
+                            <option value="en">English</option>
+                            <option value="ar">Arabic</option>
+                            <option value="ur">Urdu</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="it">Italian</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="ru">Russian</option>
+                            <option value="zh">Chinese (Simplified)</option>
+                            <option value="ja">Japanese</option>
+                            <option value="ko">Korean</option>
+                            <option value="hi">Hindi</option>
+                            <option value="tr">Turkish</option>
+                            <option value="nl">Dutch</option>
+                            <option value="pl">Polish</option>
+                            <option value="sv">Swedish</option>
+                            <option value="fi">Finnish</option>
+                            <option value="da">Danish</option>
+                            <option value="no">Norwegian</option>
+                            <option value="cs">Czech</option>
+                        </select>
                     </div>
                     
                     <div class="form-group">
-                        <label>Partner's Language:</label>
-                        <div class="language-selector">
-                            <div class="language-option-partner active" data-lang="ar">Arabic</div>
-                            <div class="language-option-partner" data-lang="en">English</div>
-                            <div class="language-option-partner" data-lang="es">Spanish</div>
-                            <div class="language-option-partner" data-lang="fr">French</div>
-                        </div>
+                        <label for="partner-language">Partner's Language:</label>
+                        <select id="partner-language" class="language-dropdown">
+                            <option value="ar">Arabic</option>
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="ur">Urdu</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="it">Italian</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="ru">Russian</option>
+                            <option value="zh">Chinese (Simplified)</option>
+                            <option value="ja">Japanese</option>
+                            <option value="ko">Korean</option>
+                            <option value="hi">Hindi</option>
+                            <option value="tr">Turkish</option>
+                            <option value="nl">Dutch</option>
+                            <option value="pl">Polish</option>
+                            <option value="sv">Swedish</option>
+                            <option value="fi">Finnish</option>
+                            <option value="da">Danish</option>
+                            <option value="no">Norwegian</option>
+                            <option value="cs">Czech</option>
+                        </select>
                     </div>
                     
                     <button class="start-btn" id="start-btn">
                         <i class="fas fa-comments"></i> Start Chat
                     </button>
                 </div>
-                
-               
             </div>
             
             <div class="room-container" id="room-container">
-                <h2 class="room-title">Share This Link with Chat-mate</h2>
+                <h2 class="room-title">Share This Link</h2>
                 <div class="room-link">
                     <div class="link-display" id="room-link">https://bridgechat.app/room/xyz123</div>
                     <button class="copy-btn" id="copy-btn">
@@ -93,12 +125,6 @@
         <!-- Footer with Legal Links -->
         <footer class="main-footer">
             <div class="footer-content">
-                <!-- <div class="footer-links">
-                    <a href="/privacy">Privacy Policy</a>
-                    <a href="/terms">Terms of Service</a>
-                    <a href="/faq">FAQ</a>
-                    <a href="/about">About</a>
-                </div> -->
                 <div class="footer-info">
                     <p>&copy; <script>document.write(new Date().getFullYear())</script> Bridge Chat. Connecting people across language barriers.</p>
                 </div>

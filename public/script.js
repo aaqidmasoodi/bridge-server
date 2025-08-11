@@ -12,8 +12,8 @@ const timerDisplay = document.getElementById('timer');
 const messagesContainer = document.getElementById('messages-container');
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
-const languageOptions = document.querySelectorAll('.language-option');
-const languageOptionsPartner = document.querySelectorAll('.language-option-partner');
+const userLanguageSelect = document.getElementById('user-language');
+const partnerLanguageSelect = document.getElementById('partner-language');
 const partnerName = document.getElementById('partner-name');
 const translationLang = document.getElementById('translation-lang');
 const startBtn = document.getElementById('start-btn');
@@ -33,32 +33,48 @@ let isJoiningRoom = false;
 const languageNames = {
     'en': 'English',
     'ar': 'Arabic',
+    'ur': 'Urdu',
     'es': 'Spanish',
-    'fr': 'French'
+    'fr': 'French',
+    'de': 'German',
+    'it': 'Italian',
+    'pt': 'Portuguese',
+    'ru': 'Russian',
+    'zh': 'Chinese (Simplified)',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'hi': 'Hindi',
+    'tr': 'Turkish',
+    'nl': 'Dutch',
+    'pl': 'Polish',
+    'sv': 'Swedish',
+    'fi': 'Finnish',
+    'da': 'Danish',
+    'no': 'Norwegian',
+    'cs': 'Czech'
 };
 
-// User language selection
-languageOptions.forEach(option => {
-    option.addEventListener('click', function() {
-        languageOptions.forEach(opt => opt.classList.remove('active'));
-        this.classList.add('active');
-        userLanguage = this.dataset.lang;
-    });
+// Set default values (English to Arabic)
+userLanguageSelect.value = 'en';
+partnerLanguageSelect.value = 'ar';
+translationLang.textContent = languageNames['ar'];
+
+// Update language when dropdown changes
+userLanguageSelect.addEventListener('change', function() {
+    userLanguage = this.value;
 });
 
-// Partner language selection
-languageOptionsPartner.forEach(option => {
-    option.addEventListener('click', function() {
-        languageOptionsPartner.forEach(opt => opt.classList.remove('active'));
-        this.classList.add('active');
-        partnerLanguage = this.dataset.lang;
-        translationLang.textContent = languageNames[partnerLanguage] || partnerLanguage;
-    });
+partnerLanguageSelect.addEventListener('change', function() {
+    partnerLanguage = this.value;
+    translationLang.textContent = languageNames[partnerLanguage] || partnerLanguage;
 });
 
 // Start chat button
 startBtn.addEventListener('click', function() {
     username = usernameInput.value.trim() || 'User';
+    userLanguage = userLanguageSelect.value;
+    partnerLanguage = partnerLanguageSelect.value;
+    
     if (isJoiningRoom) {
         joinExistingRoom();
     } else {
@@ -138,7 +154,7 @@ function joinExistingRoom() {
         socket.emit('join-room', {
             roomId: roomMatch[1],
             username: username,
-            language: userLanguage // This should be the partner's language
+            language: userLanguage
         });
     }
 }
@@ -233,23 +249,14 @@ function startTimer() {
 function autoSelectPartnerLanguage(creatorLanguage, partnerLanguage) {
     console.log('Auto-selecting languages:', creatorLanguage, partnerLanguage);
     
-    // Clear all active selections
-    languageOptions.forEach(opt => opt.classList.remove('active'));
-    languageOptionsPartner.forEach(opt => opt.classList.remove('active'));
-    
     // Select partner's language as user's language (for joiner)
-    const userOption = document.querySelector(`.language-option[data-lang="${partnerLanguage}"]`);
-    if (userOption) {
-        userOption.classList.add('active');
-        userLanguage = partnerLanguage;
-    }
+    userLanguageSelect.value = partnerLanguage;
+    userLanguage = partnerLanguage;
     
     // Select creator's language as partner's language
-    const partnerOption = document.querySelector(`.language-option-partner[data-lang="${creatorLanguage}"]`);
-    if (partnerOption) {
-        partnerOption.classList.add('active');
-        translationLang.textContent = languageNames[creatorLanguage] || creatorLanguage;
-    }
+    partnerLanguageSelect.value = creatorLanguage;
+    partnerLanguage = creatorLanguage;
+    translationLang.textContent = languageNames[creatorLanguage] || creatorLanguage;
 }
 
 // Socket event listeners

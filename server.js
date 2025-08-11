@@ -41,14 +41,35 @@ async function translateText(text, sourceLang, targetLang) {
     
     // Map language codes to language names
     const languageMap = {
-      'en': 'English',
-      'ar': 'Arabic',
-      'es': 'Spanish',
-      'fr': 'French'
+    'en': 'English',
+    'ar': 'Arabic',
+    'ur': 'Urdu',
+    'es': 'Spanish',
+    'fr': 'French',
+    'de': 'German',
+    'it': 'Italian',
+    'pt': 'Portuguese',
+    'ru': 'Russian',
+    'zh': 'Chinese (Simplified)',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'hi': 'Hindi',
+    'tr': 'Turkish',
+    'nl': 'Dutch',
+    'pl': 'Polish',
+    'sv': 'Swedish',
+    'fi': 'Finnish',
+    'da': 'Danish',
+    'no': 'Norwegian',
+    'cs': 'Czech'
     };
     
     const sourceLangName = languageMap[sourceLang] || 'English';
     const targetLangName = languageMap[targetLang] || 'Arabic';
+
+    console.log(sourceLangName);
+    console.log(targetLangName);
+    
     
     // Create prompt for translation
     const prompt = `Translate the following text from ${sourceLangName} to ${targetLangName}. Only provide the translation, nothing else:\n\n"${text}"`;
@@ -134,7 +155,7 @@ io.on('connection', (socket) => {
     console.log(`Room created: ${roomId} with creator language: ${userLanguage}, partner language: ${partnerLanguage}`);
   });
 
-  // Get room info for joiners
+  // Get room info for joiners (for automatic language selection)
   socket.on('get-room-info', (data) => {
     const { roomId } = data;
     
@@ -147,6 +168,10 @@ io.on('connection', (socket) => {
         creatorLanguage: room.creatorLanguage,
         partnerLanguage: room.partnerLanguage
       });
+      
+      console.log(`Sent room info for room: ${roomId}`);
+    } else {
+      socket.emit('error', { message: 'Room not found' });
     }
   });
 

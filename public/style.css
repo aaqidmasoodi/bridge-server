@@ -279,6 +279,59 @@ body {
     box-shadow: 0 5px 15px rgba(78, 205, 196, 0.4);
 }
 
+
+
+/* Language Dropdown Styles */
+.language-dropdown {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    outline: none;
+    transition: border 0.3s;
+    background: white;
+    color: #333;
+}
+
+.language-dropdown:focus {
+    border-color: #4ecdc4;
+}
+
+/* Update form group styles */
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 15px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .language-dropdown {
+        font-size: 15px;
+        padding: 10px 12px;
+    }
+    
+    .form-group label {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .language-dropdown {
+        font-size: 14px;
+        padding: 8px 10px;
+    }
+}
+
+
 /* Info Section Styles */
 .info-section {
     margin-top: 25px;
