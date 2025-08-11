@@ -72,7 +72,7 @@ async function translateText(text, sourceLang, targetLang) {
     
     
     // Create prompt for translation
-    const prompt = `Translate the following text from ${sourceLangName} to ${targetLangName}. Only provide the translation, nothing else:\n\n"${text}"`;
+    const prompt = `Translate the following text from ${sourceLangName} to ${targetLangName}. Only provide the translation, nothing else. If the text is invalid Return the given text back, nothing else.:\n\n"${text}"`;
     
     console.log(`Translating: ${text} from ${sourceLangName} to ${targetLangName}`);
     
