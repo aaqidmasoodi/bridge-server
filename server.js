@@ -19,8 +19,53 @@ const io = socketIo(server, {
 app.use(express.static('public'));
 app.use(cors());
 
-// Serve the main HTML file for ALL routes (client-side routing)
-app.get('*', (req, res) => {
+// Specific routes for documentation pages
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
+app.get('/how-it-works', (req, res) => {
+  res.sendFile(__dirname + '/public/how-it-works.html');
+});
+
+app.get('/about', (req, res) => {
+  res.sendFile(__dirname + '/public/about.html');
+});
+
+app.get('/contact', (req, res) => {
+  res.sendFile(__dirname + '/public/contact.html');
+});
+
+app.get('/faq', (req, res) => {
+  res.sendFile(__dirname + '/public/faq.html');
+});
+
+app.get('/blog', (req, res) => {
+  res.sendFile(__dirname + '/public/blog.html');
+});
+
+app.get('/resources', (req, res) => {
+  res.sendFile(__dirname + '/public/resources.html');
+});
+
+app.get('/use-cases', (req, res) => {
+  res.sendFile(__dirname + '/public/use-cases.html');
+});
+
+// Language-specific routes
+app.get('/language/:lang', (req, res) => {
+  const lang = req.params.lang;
+  const filePath = __dirname + `/public/language/${lang}.html`;
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      // If language file doesn't exist, serve the main index.html
+      res.sendFile(__dirname + '/public/index.html');
+    }
+  });
+});
+
+// Room routes (for the chat app)
+app.get('/room/*', (req, res) => {
   res.sendFile(__dirname + '/public/index.html');
 });
 
@@ -41,38 +86,34 @@ async function translateText(text, sourceLang, targetLang) {
     
     // Map language codes to language names
     const languageMap = {
-    'en': 'English',
-    'ar': 'Arabic',
-    'ur': 'Urdu',
-    'es': 'Spanish',
-    'fr': 'French',
-    'de': 'German',
-    'it': 'Italian',
-    'pt': 'Portuguese',
-    'ru': 'Russian',
-    'zh': 'Chinese (Simplified)',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-    'hi': 'Hindi',
-    'tr': 'Turkish',
-    'nl': 'Dutch',
-    'pl': 'Polish',
-    'sv': 'Swedish',
-    'fi': 'Finnish',
-    'da': 'Danish',
-    'no': 'Norwegian',
-    'cs': 'Czech'
+      'en': 'English',
+      'ar': 'Arabic',
+      'ur': 'Urdu',
+      'es': 'Spanish',
+      'fr': 'French',
+      'de': 'German',
+      'it': 'Italian',
+      'pt': 'Portuguese',
+      'ru': 'Russian',
+      'zh': 'Chinese (Simplified)',
+      'ja': 'Japanese',
+      'ko': 'Korean',
+      'hi': 'Hindi',
+      'tr': 'Turkish',
+      'nl': 'Dutch',
+      'pl': 'Polish',
+      'sv': 'Swedish',
+      'fi': 'Finnish',
+      'da': 'Danish',
+      'no': 'Norwegian',
+      'cs': 'Czech'
     };
     
     const sourceLangName = languageMap[sourceLang] || 'English';
     const targetLangName = languageMap[targetLang] || 'Arabic';
-
-    console.log(sourceLangName);
-    console.log(targetLangName);
-    
     
     // Create prompt for translation
-    const prompt = `Translate the following text from ${sourceLangName} to ${targetLangName}. Only provide the translation, nothing else. If the text is invalid Return the given text back, nothing else.:\n\n"${text}"`;
+    const prompt = `Translate the following text from ${sourceLangName} to ${targetLangName}. Only provide the translation, nothing else:\n\n"${text}"`;
     
     console.log(`Translating: ${text} from ${sourceLangName} to ${targetLangName}`);
     
