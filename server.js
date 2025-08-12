@@ -52,6 +52,10 @@ app.get('/use-cases', (req, res) => {
   res.sendFile(__dirname + '/public/use-cases.html');
 });
 
+app.get('/privacy-policy', (req, res) => {
+  res.sendFile(__dirname + '/public/privacy-policy.html');
+});
+
 // Language-specific routes
 app.get('/language/:lang', (req, res) => {
   const lang = req.params.lang;
