@@ -1,15 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-GE0EJTTRMV"></script>
     <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-GE0EJTTRMV');
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-GE0EJTTRMV');
     </script>
     
     <meta charset="UTF-8">
@@ -20,11 +18,9 @@
 </head>
 <body>
     <div class="container">
-     <div class="header">
+        <div class="header">
             <h1><i class="fas fa-bridge"></i> Bridge Chat</h1>
             <p>Connecting people across language barriers</p>
-
-
             <nav class="main-nav">
                 <ul>
                     <li><a href="/"><i class="fas fa-home"></i> Home</a></li>
@@ -35,8 +31,41 @@
             </nav>
         </div>
                 
-        
         <div class="content">
+            <!-- Home Page Welcome Screen -->
+            <div class="welcome-container" id="welcome-container">
+                <div class="home-options">
+                    <button class="option-btn" id="create-chat-btn">
+                        <i class="fas fa-plus"></i> Setup a Chat Room
+                    </button>
+                    <button class="option-btn" id="join-chat-btn">
+                        <i class="fas fa-sign-in-alt"></i> Join a Chat Room
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Join Room Form (without name field) -->
+            <div class="join-room-container" id="join-room-container">
+                <h2 class="join-room-title">Join Chat Room</h2>
+                <div class="join-room-form">
+                    <div class="form-group">
+                        <label for="room-code">Enter Room Code:</label>
+                        <input type="text" id="room-code" placeholder="e.g. abc123" maxlength="8">
+                        <p class="help-text">Enter the 6-8 character room code shared with you</p>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button class="back-btn" id="back-to-welcome">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                        <button class="join-btn" id="submit-room-code">
+                            <i class="fas fa-sign-in-alt"></i> Join Room
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Setup Container -->
             <div class="setup-container" id="setup-container">
                 <h2 class="setup-title">Setup Your Chat</h2>
                 <div class="setup-form">
@@ -44,7 +73,6 @@
                         <label for="username">Your Name:</label>
                         <input type="text" id="username" placeholder="e.g Aaqid">
                     </div>
-                    
                     <div class="form-group">
                         <label for="user-language">Your Language:</label>
                         <select id="user-language" class="language-dropdown">
@@ -71,7 +99,6 @@
                             <option value="cs">Czech</option>
                         </select>
                     </div>
-                    
                     <div class="form-group">
                         <label for="partner-language">Partner's Language:</label>
                         <select id="partner-language" class="language-dropdown">
@@ -98,13 +125,16 @@
                             <option value="cs">Czech</option>
                         </select>
                     </div>
-                    
                     <button class="start-btn" id="start-btn">
                         <i class="fas fa-comments"></i> Start Chat
                     </button>
                 </div>
+                <div class="have-code-section">
+                    <p>Already have a room code? <a href="#" id="have-code-link">Join existing room</a></p>
+                </div>
             </div>
             
+            <!-- Room Container -->
             <div class="room-container" id="room-container">
                 <h2 class="room-title">Share This Link</h2>
                 <div class="room-link">
@@ -113,11 +143,18 @@
                         <i class="fas fa-copy"></i> Copy Link
                     </button>
                 </div>
+                <div class="room-code-share">
+                    <p>Or share this room code: <strong id="room-code-display">XYZ123</strong></p>
+                    <button class="copy-code-btn" id="copy-code-btn">
+                        <i class="fas fa-copy"></i> Copy Code
+                    </button>
+                </div>
                 <div class="status waiting" id="status">
                     <i class="fas fa-clock"></i> Waiting for partner... (Room expires in <span id="timer">5:00</span>)
                 </div>
             </div>
             
+            <!-- Chat Container -->
             <div class="chat-container" id="chat-container">
                 <div class="chat-header">
                     <div class="chat-header-info">
@@ -130,11 +167,9 @@
                         </button>
                     </div>
                 </div>
-                
                 <div class="messages" id="messages-container">
                     <!-- Messages will be added here dynamically -->
                 </div>
-                
                 <div class="message-input-area">
                     <input type="text" class="message-input" id="message-input" placeholder="Type your message...">
                     <button class="send-button" id="send-button">
@@ -144,11 +179,11 @@
             </div>
         </div>
         
-        <!-- Footer with Legal Links -->
-       <footer class="main-footer">
+        <!-- Footer -->
+        <footer class="main-footer">
             <div class="footer-content">
                 <div class="footer-links">
-                   <a href="/privacy-policy"><i class="fas fa-book"></i> Privacy Policy</a>
+                    <a href="/privacy-policy"><i class="fas fa-book"></i> Privacy Policy</a>
                     <a href="/use-cases"><i class="fas fa-suitcase"></i> Use Cases</a>
                     <a href="/faq"><i class="fas fa-question"></i> FAQs</a>
                 </div>
@@ -159,6 +194,7 @@
         </footer>
     </div>
 
+    <!-- External Scripts -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="/script.js"></script>
 </body>

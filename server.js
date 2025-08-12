@@ -69,7 +69,12 @@ app.get('/language/:lang', (req, res) => {
 });
 
 // Room routes (for the chat app)
-app.get('/room/*', (req, res) => {
+app.get('/room/:roomId', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
+// Catch-all route for client-side routing (must be LAST)
+app.get('*', (req, res) => {
   res.sendFile(__dirname + '/public/index.html');
 });
 
@@ -160,10 +165,10 @@ io.on('connection', (socket) => {
   socket.on('create-room', (data) => {
     const { username, userLanguage, partnerLanguage } = data;
     
-    // Generate a new room ID (8 characters)
+    // Generate a new room ID (8 characters) in lowercase
     let roomId;
     do {
-      roomId = uuidv4().substring(0, 8);
+      roomId = uuidv4().substring(0, 8).toLowerCase();
     } while (rooms.has(roomId)); // Ensure uniqueness
     
     // Create room with creator as first participant
@@ -216,7 +221,12 @@ io.on('connection', (socket) => {
       
       console.log(`Sent room info for room: ${roomId}`);
     } else {
-      socket.emit('error', { message: 'Room not found' });
+      // Room not found - send specific error with immediate redirect flag
+      socket.emit('error', { 
+        message: 'Room not found. Redirecting to homepage...', 
+        type: 'room-not-found',
+        redirect: true
+      });
     }
   });
 
@@ -226,7 +236,12 @@ io.on('connection', (socket) => {
     
     // Check if room exists
     if (!rooms.has(roomId)) {
-      socket.emit('error', { message: 'Room not found' });
+      // Room not found - send specific error with immediate redirect flag
+      socket.emit('error', { 
+        message: 'Room not found. Redirecting to homepage...', 
+        type: 'room-not-found',
+        redirect: true
+      });
       return;
     }
     

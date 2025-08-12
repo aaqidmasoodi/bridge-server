@@ -2,11 +2,14 @@
 const socket = io();
 
 // DOM elements
+const welcomeContainer = document.getElementById('welcome-container');
+const joinRoomContainer = document.getElementById('join-room-container');
 const setupContainer = document.getElementById('setup-container');
 const roomContainer = document.getElementById('room-container');
 const chatContainer = document.getElementById('chat-container');
 const roomLink = document.getElementById('room-link');
 const copyBtn = document.getElementById('copy-btn');
+const copyCodeBtn = document.getElementById('copy-code-btn');
 const status = document.getElementById('status');
 const timerDisplay = document.getElementById('timer');
 const messagesContainer = document.getElementById('messages-container');
@@ -19,6 +22,14 @@ const translationLang = document.getElementById('translation-lang');
 const startBtn = document.getElementById('start-btn');
 const usernameInput = document.getElementById('username');
 const endChatBtn = document.getElementById('end-chat-btn');
+const joinUsernameInput = document.getElementById('join-username');
+const roomCodeInput = document.getElementById('room-code');
+const createChatBtn = document.getElementById('create-chat-btn');
+const joinChatBtn = document.getElementById('join-chat-btn');
+const backToWelcome = document.getElementById('back-to-welcome');
+const submitRoomCode = document.getElementById('submit-room-code');
+const haveCodeLink = document.getElementById('have-code-link');
+const roomCodeDisplay = document.getElementById('room-code-display');
 
 // Global variables
 let currentRoomId = null;
@@ -69,6 +80,56 @@ partnerLanguageSelect.addEventListener('change', function() {
     translationLang.textContent = languageNames[partnerLanguage] || partnerLanguage;
 });
 
+// Home page button event listeners
+createChatBtn.addEventListener('click', function() {
+    welcomeContainer.style.display = 'none';
+    setupContainer.style.display = 'block';
+});
+
+joinChatBtn.addEventListener('click', function() {
+    welcomeContainer.style.display = 'none';
+    joinRoomContainer.style.display = 'block';
+});
+
+// Back to welcome button
+backToWelcome.addEventListener('click', function() {
+    joinRoomContainer.style.display = 'none';
+    welcomeContainer.style.display = 'flex';
+});
+
+// Have code link
+haveCodeLink.addEventListener('click', function(e) {
+    e.preventDefault();
+    setupContainer.style.display = 'none';
+    joinRoomContainer.style.display = 'block';
+});
+
+// Submit room code - SIMPLE VERSION
+submitRoomCode.addEventListener('click', function() {
+    const roomCode = roomCodeInput.value.trim();
+    
+    if (!roomCode) {
+        alert('Please enter a room code');
+        return;
+    }
+    
+    // Validate room code format (6-8 alphanumeric characters)
+    if (!/^[a-zA-Z0-9]{6,8}$/.test(roomCode)) {
+        alert('Please enter a valid room code (6-8 alphanumeric characters)');
+        return;
+    }
+    
+    // REDIRECT DIRECTLY TO ROOM URL
+    window.location.href = `/room/${roomCode}`;
+});
+
+// Allow Enter key to submit room code
+roomCodeInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        submitRoomCode.click();
+    }
+});
+
 // Start chat button
 startBtn.addEventListener('click', function() {
     username = usernameInput.value.trim() || 'User';
@@ -114,6 +175,20 @@ copyBtn.addEventListener('click', function() {
             alert('Please press Ctrl+C to copy the link');
         }
         document.body.removeChild(textArea);
+    });
+});
+
+// Copy room code to clipboard
+copyCodeBtn.addEventListener('click', function() {
+    navigator.clipboard.writeText(roomCodeDisplay.textContent).then(() => {
+        const originalText = copyCodeBtn.innerHTML;
+        copyCodeBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+            copyCodeBtn.innerHTML = originalText;
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        alert('Please press Ctrl+C to copy the room code');
     });
 });
 
@@ -257,6 +332,10 @@ function autoSelectPartnerLanguage(creatorLanguage, partnerLanguage) {
     partnerLanguageSelect.value = creatorLanguage;
     partnerLanguage = creatorLanguage;
     translationLang.textContent = languageNames[creatorLanguage] || creatorLanguage;
+    
+    // Disable language selection for joiners
+    userLanguageSelect.disabled = true;
+    partnerLanguageSelect.disabled = true;
 }
 
 // Socket event listeners
@@ -265,6 +344,7 @@ socket.on('room-created', (data) => {
     // Use the actual URL from the browser
     const actualUrl = window.location.origin + '/room/' + currentRoomId;
     roomLink.textContent = actualUrl;
+    roomCodeDisplay.textContent = currentRoomId.toLowerCase();
     startTimer();
     
     // Update the browser URL to the new room URL
@@ -336,8 +416,24 @@ socket.on('return-to-setup', () => {
     redirectToHomepage();
 });
 
+
+// Handle room not found error
 socket.on('error', (data) => {
-    alert(`Error: ${data.message}`);
+    // If it's a room not found error, redirect immediately
+    if (data.type === 'room-not-found') {
+        alert(`Error: ${data.message}`);
+        redirectToHomepage();
+    } else {
+        // For other errors, just show the message
+        alert(`Error: ${data.message}`);
+    }
+});
+
+socket.on('room-info', (data) => {
+    if (data.creatorLanguage && data.partnerLanguage) {
+        console.log('Received room info:', data);
+        autoSelectPartnerLanguage(data.creatorLanguage, data.partnerLanguage);
+    }
 });
 
 // Check if we're joining an existing room
@@ -350,6 +446,7 @@ window.addEventListener('DOMContentLoaded', () => {
         isJoiningRoom = true;
         
         // Show setup for joiner but with different flow
+        welcomeContainer.style.display = 'none';
         setupContainer.style.display = 'block';
         document.querySelector('.setup-title').textContent = 'Join Chat Room';
         document.querySelector('.start-btn').innerHTML = '<i class="fas fa-sign-in-alt"></i> Join Room';
@@ -359,17 +456,13 @@ window.addEventListener('DOMContentLoaded', () => {
             roomId: roomMatch[1]
         });
     } else {
-        // First visitor - show setup
-        setupContainer.style.display = 'block';
+        // First visitor - show welcome screen
+        welcomeContainer.style.display = 'flex';
+        setupContainer.style.display = 'none';
+        joinRoomContainer.style.display = 'none';
+        roomContainer.style.display = 'none';
+        chatContainer.style.display = 'none';
         isJoiningRoom = false;
-    }
-});
-
-// Handle getting room info for joiners
-socket.on('room-info', (data) => {
-    if (data.creatorLanguage && data.partnerLanguage) {
-        console.log('Received room info:', data);
-        autoSelectPartnerLanguage(data.creatorLanguage, data.partnerLanguage);
     }
 });
 
