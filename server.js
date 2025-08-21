@@ -19,7 +19,69 @@ const io = socketIo(server, {
 app.use(express.static('public'));
 app.use(cors());
 
-// Serve the main HTML file for all routes (client-side routing)
+// Specific routes for documentation pages
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
+app.get('/how-it-works', (req, res) => {
+  res.sendFile(__dirname + '/public/how-it-works.html');
+});
+
+app.get('/about', (req, res) => {
+  res.sendFile(__dirname + '/public/about.html');
+});
+
+app.get('/contact', (req, res) => {
+  res.sendFile(__dirname + '/public/contact.html');
+});
+
+app.get('/faq', (req, res) => {
+  res.sendFile(__dirname + '/public/faq.html');
+});
+
+app.get('/blog', (req, res) => {
+  res.sendFile(__dirname + '/public/blog.html');
+});
+
+app.get('/resources', (req, res) => {
+  res.sendFile(__dirname + '/public/resources.html');
+});
+
+app.get('/use-cases', (req, res) => {
+  res.sendFile(__dirname + '/public/use-cases.html');
+});
+
+app.get('/privacy-policy', (req, res) => {
+  res.sendFile(__dirname + '/public/privacy-policy.html');
+});
+
+app.get('/chats', (req, res) => {
+  res.sendFile(__dirname + '/public/chats.html');
+});
+
+app.get('/settings', (req, res) => {
+  res.sendFile(__dirname + '/public/settings.html');
+});
+
+// Language-specific routes
+app.get('/language/:lang', (req, res) => {
+  const lang = req.params.lang;
+  const filePath = __dirname + `/public/language/${lang}.html`;
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      // If language file doesn't exist, serve the main index.html
+      res.sendFile(__dirname + '/public/index.html');
+    }
+  });
+});
+
+// Room routes (for the chat app)
+app.get('/room/:roomId', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
+// Catch-all route for client-side routing (must be LAST)
 app.get('*', (req, res) => {
   res.sendFile(__dirname + '/public/index.html');
 });
@@ -72,7 +134,7 @@ async function translateText(text, sourceLang, targetLang) {
     
     console.log(`Translating: ${text} from ${sourceLangName} to ${targetLangName}`);
     
-    // Call Groq API
+    // Call Groq API (FIXED: removed extra space in URL)
     const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
       messages: [
         {
