@@ -1,478 +1,348 @@
-// Initialize Socket.IO connection
-const socket = io();
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const { v4: uuidv4 } = require('uuid');
+const cors = require('cors');
+const axios = require('axios');
+require('dotenv').config();
 
-// DOM elements
-const welcomeContainer = document.getElementById('welcome-container');
-const joinRoomContainer = document.getElementById('join-room-container');
-const setupContainer = document.getElementById('setup-container');
-const roomContainer = document.getElementById('room-container');
-const chatContainer = document.getElementById('chat-container');
-const roomLink = document.getElementById('room-link');
-const copyBtn = document.getElementById('copy-btn');
-const copyCodeBtn = document.getElementById('copy-code-btn');
-const status = document.getElementById('status');
-const timerDisplay = document.getElementById('timer');
-const messagesContainer = document.getElementById('messages-container');
-const messageInput = document.getElementById('message-input');
-const sendButton = document.getElementById('send-button');
-const userLanguageSelect = document.getElementById('user-language');
-const partnerLanguageSelect = document.getElementById('partner-language');
-const partnerName = document.getElementById('partner-name');
-const translationLang = document.getElementById('translation-lang');
-const startBtn = document.getElementById('start-btn');
-const usernameInput = document.getElementById('username');
-const endChatBtn = document.getElementById('end-chat-btn');
-const joinUsernameInput = document.getElementById('join-username');
-const roomCodeInput = document.getElementById('room-code');
-const createChatBtn = document.getElementById('create-chat-btn');
-const joinChatBtn = document.getElementById('join-chat-btn');
-const backToWelcome = document.getElementById('back-to-welcome');
-const submitRoomCode = document.getElementById('submit-room-code');
-const haveCodeLink = document.getElementById('have-code-link');
-const roomCodeDisplay = document.getElementById('room-code-display');
-
-// Global variables
-let currentRoomId = null;
-let username = 'User';
-let userLanguage = 'en';
-let partnerLanguage = 'ar';
-let timeLeft = 300; // 5 minutes in seconds
-let timer = null;
-let isJoiningRoom = false;
-
-// Language names mapping
-const languageNames = {
-    'en': 'English',
-    'ar': 'Arabic',
-    'ur': 'Urdu',
-    'es': 'Spanish',
-    'fr': 'French',
-    'de': 'German',
-    'it': 'Italian',
-    'pt': 'Portuguese',
-    'ru': 'Russian',
-    'zh': 'Chinese (Simplified)',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-    'hi': 'Hindi',
-    'tr': 'Turkish',
-    'nl': 'Dutch',
-    'pl': 'Polish',
-    'sv': 'Swedish',
-    'fi': 'Finnish',
-    'da': 'Danish',
-    'no': 'Norwegian',
-    'cs': 'Czech'
-};
-
-// Set default values (English to Arabic)
-userLanguageSelect.value = 'en';
-partnerLanguageSelect.value = 'ar';
-translationLang.textContent = languageNames['ar'];
-
-// Update language when dropdown changes
-userLanguageSelect.addEventListener('change', function() {
-    userLanguage = this.value;
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
 });
 
-partnerLanguageSelect.addEventListener('change', function() {
-    partnerLanguage = this.value;
-    translationLang.textContent = languageNames[partnerLanguage] || partnerLanguage;
+// Serve static files from public directory
+app.use(express.static('public'));
+app.use(cors());
+
+// Serve the main HTML file for all routes (client-side routing)
+app.get('*', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
 });
 
-// Home page button event listeners
-createChatBtn.addEventListener('click', function() {
-    welcomeContainer.style.display = 'none';
-    setupContainer.style.display = 'block';
-});
+// Store active rooms and their participants
+const rooms = new Map();
 
-joinChatBtn.addEventListener('click', function() {
-    welcomeContainer.style.display = 'none';
-    joinRoomContainer.style.display = 'block';
-});
+// Room cleanup timer (5 minutes)
+const ROOM_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
-// Back to welcome button
-backToWelcome.addEventListener('click', function() {
-    joinRoomContainer.style.display = 'none';
-    welcomeContainer.style.display = 'flex';
-});
-
-// Have code link
-haveCodeLink.addEventListener('click', function(e) {
-    e.preventDefault();
-    setupContainer.style.display = 'none';
-    joinRoomContainer.style.display = 'block';
-});
-
-// Submit room code - SIMPLE VERSION
-submitRoomCode.addEventListener('click', function() {
-    const roomCode = roomCodeInput.value.trim();
-    
-    if (!roomCode) {
-        alert('Please enter a room code');
-        return;
+// Function to translate text using Groq API
+async function translateText(text, sourceLang, targetLang) {
+  try {
+    // Only proceed if we have an API key
+    if (!process.env.GROQ_API_KEY) {
+      console.warn('No GROQ_API_KEY found, returning original text');
+      return text;
     }
     
-    // Validate room code format (6-8 alphanumeric characters)
-    if (!/^[a-zA-Z0-9]{6,8}$/.test(roomCode)) {
-        alert('Please enter a valid room code (6-8 alphanumeric characters)');
-        return;
-    }
+    // Map language codes to language names
+    const languageMap = {
+      'en': 'English',
+      'ar': 'Arabic',
+      'ur': 'Urdu',
+      'es': 'Spanish',
+      'fr': 'French',
+      'de': 'German',
+      'it': 'Italian',
+      'pt': 'Portuguese',
+      'ru': 'Russian',
+      'zh': 'Chinese (Simplified)',
+      'ja': 'Japanese',
+      'ko': 'Korean',
+      'hi': 'Hindi',
+      'tr': 'Turkish',
+      'nl': 'Dutch',
+      'pl': 'Polish',
+      'sv': 'Swedish',
+      'fi': 'Finnish',
+      'da': 'Danish',
+      'no': 'Norwegian',
+      'cs': 'Czech'
+    };
     
-    // REDIRECT DIRECTLY TO ROOM URL
-    window.location.href = `/room/${roomCode}`;
-});
-
-// Allow Enter key to submit room code
-roomCodeInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        submitRoomCode.click();
-    }
-});
-
-// Start chat button
-startBtn.addEventListener('click', function() {
-    username = usernameInput.value.trim() || 'User';
-    userLanguage = userLanguageSelect.value;
-    partnerLanguage = partnerLanguageSelect.value;
+    const sourceLangName = languageMap[sourceLang] || 'English';
+    const targetLangName = languageMap[targetLang] || 'Arabic';
     
-    if (isJoiningRoom) {
-        joinExistingRoom();
-    } else {
-        startChat();
-    }
-});
-
-// End chat button
-endChatBtn.addEventListener('click', function() {
-    if (confirm('Are you sure you want to end this chat? This will close the room for both participants.')) {
-        endChat('ended');
-    }
-});
-
-// Copy room link to clipboard
-copyBtn.addEventListener('click', function() {
-    navigator.clipboard.writeText(roomLink.textContent).then(() => {
-        const originalText = copyBtn.innerHTML;
-        copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-        setTimeout(() => {
-            copyBtn.innerHTML = originalText;
-        }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-        // Fallback: select text and prompt user to copy
-        const textArea = document.createElement('textarea');
-        textArea.value = roomLink.textContent;
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-            document.execCommand('copy');
-            copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-            setTimeout(() => {
-                copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy Link';
-            }, 2000);
-        } catch (err) {
-            alert('Please press Ctrl+C to copy the link');
+    // Create prompt for translation
+    const prompt = `Translate the following text from ${sourceLangName} to ${targetLangName}. Only provide the translation, nothing else:\n\n"${text}"`;
+    
+    console.log(`Translating: ${text} from ${sourceLangName} to ${targetLangName}`);
+    
+    // Call Groq API
+    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+      messages: [
+        {
+          role: "user",
+          content: prompt
         }
-        document.body.removeChild(textArea);
+      ],
+      model: "llama3-8b-8192",
+      temperature: 0.3,
+      max_tokens: 1024,
+      top_p: 1,
+      stream: false,
+      stop: null
+    }, {
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
     });
-});
-
-// Copy room code to clipboard
-copyCodeBtn.addEventListener('click', function() {
-    navigator.clipboard.writeText(roomCodeDisplay.textContent).then(() => {
-        const originalText = copyCodeBtn.innerHTML;
-        copyCodeBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-        setTimeout(() => {
-            copyCodeBtn.innerHTML = originalText;
-        }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-        alert('Please press Ctrl+C to copy the room code');
-    });
-});
-
-// Send message when button is clicked
-sendButton.addEventListener('click', sendMessage);
-
-// Send message when Enter is pressed
-messageInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        sendMessage();
-    }
-});
-
-// Function to start chat
-function startChat() {
-    // Hide setup, show room container
-    setupContainer.style.display = 'none';
-    roomContainer.style.display = 'block';
     
-    // Create room with selected languages
-    socket.emit('create-room', {
+    // Extract translated text
+    const translatedText = response.data.choices[0].message.content.trim();
+    console.log(`Translation result: ${translatedText}`);
+    return translatedText;
+  } catch (error) {
+    console.error('Translation error:', error.response?.data || error.message);
+    return text; // Return original text if translation fails
+  }
+}
+
+// Socket connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  // Create a new chat room
+  socket.on('create-room', (data) => {
+    const { username, userLanguage, partnerLanguage } = data;
+    
+    // Generate a new room ID (8 characters)
+    let roomId;
+    do {
+      roomId = uuidv4().substring(0, 8);
+    } while (rooms.has(roomId)); // Ensure uniqueness
+    
+    // Create room with creator as first participant
+    rooms.set(roomId, {
+      id: roomId,
+      participants: [{
+        id: socket.id,
         username: username,
-        userLanguage: userLanguage,
-        partnerLanguage: partnerLanguage
-    });
-}
-
-// Function to join existing room
-function joinExistingRoom() {
-    // Hide setup, show room container
-    setupContainer.style.display = 'none';
-    roomContainer.style.display = 'block';
-    
-    const path = window.location.pathname;
-    const roomMatch = path.match(/\/room\/([a-zA-Z0-9]+)/);
-    
-    if (roomMatch) {
-        socket.emit('join-room', {
-            roomId: roomMatch[1],
-            username: username,
-            language: userLanguage
-        });
-    }
-}
-
-// Function to end chat
-function endChat(reason = 'ended') {
-    // Notify server that chat is ending
-    if (currentRoomId) {
-        socket.emit('end-chat', {
-            roomId: currentRoomId
-        });
-    }
-}
-
-// Function to redirect to homepage (as if visiting for first time)
-function redirectToHomepage() {
-    // Redirect to root path
-    window.location.href = '/';
-}
-
-// Function to send message
-function sendMessage() {
-    const message = messageInput.value.trim();
-    if (message && currentRoomId) {
-        socket.emit('send-message', {
-            roomId: currentRoomId,
-            message: message
-        });
-        messageInput.value = '';
-    }
-}
-
-// Function to add message to chat
-function addMessage(message, translatedMessage, username, isOwn) {
-    const messageDiv = document.createElement('div');
-    messageDiv.classList.add('message');
-    messageDiv.classList.add(isOwn ? 'sent' : 'received');
-    
-    const now = new Date();
-    const timeString = now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
-    
-    messageDiv.innerHTML = `
-        <div class="original-text">${message}</div>
-        <div class="translated-text">${translatedMessage}</div>
-        <div class="message-time">${timeString} ${isOwn ? '' : '(' + username + ')'}</div>
-    `;
-    
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-// Function to add system message to chat
-function addSystemMessage(text) {
-    const messageDiv = document.createElement('div');
-    messageDiv.classList.add('message');
-    messageDiv.classList.add('system');
-    
-    const now = new Date();
-    const timeString = now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
-    
-    messageDiv.innerHTML = `
-        <div>${text}</div>
-        <div class="message-time">${timeString}</div>
-    `;
-    
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-// Function to start room timer
-function startTimer() {
-    // Clear any existing timer
-    if (timer) {
-        clearInterval(timer);
-    }
-    
-    timer = setInterval(() => {
-        timeLeft--;
-        const minutes = Math.floor(timeLeft / 60);
-        const seconds = timeLeft % 60;
-        timerDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-        
-        if (timeLeft <= 0) {
-            clearInterval(timer);
-            status.innerHTML = '<i class="fas fa-times-circle"></i> Room expired. Please create a new room.';
-            status.className = 'status waiting';
+        language: userLanguage,
+        joinedAt: new Date()
+      }],
+      creatorLanguage: userLanguage,      // Store creator's language
+      partnerLanguage: partnerLanguage,    // Store partner's language
+      createdAt: new Date(),
+      timeout: setTimeout(() => {
+        // Delete room after timeout if not full
+        if (rooms.has(roomId) && rooms.get(roomId).participants.length < 2) {
+          rooms.delete(roomId);
+          io.to(roomId).emit('room-expired');
         }
-    }, 1000);
-}
+      }, ROOM_TIMEOUT)
+    });
 
-// Function to automatically select partner language
-function autoSelectPartnerLanguage(creatorLanguage, partnerLanguage) {
-    console.log('Auto-selecting languages:', creatorLanguage, partnerLanguage);
+    // Join the room
+    socket.join(roomId);
     
-    // Select partner's language as user's language (for joiner)
-    userLanguageSelect.value = partnerLanguage;
-    userLanguage = partnerLanguage;
+    // Send room info to creator
+    socket.emit('room-created', {
+      roomId,
+      creatorLanguage: userLanguage,
+      partnerLanguage: partnerLanguage
+    });
     
-    // Select creator's language as partner's language
-    partnerLanguageSelect.value = creatorLanguage;
-    partnerLanguage = creatorLanguage;
-    translationLang.textContent = languageNames[creatorLanguage] || creatorLanguage;
-    
-    // Disable language selection for joiners
-    userLanguageSelect.disabled = true;
-    partnerLanguageSelect.disabled = true;
-}
+    console.log(`Room created: ${roomId} with creator language: ${userLanguage}, partner language: ${partnerLanguage}`);
+  });
 
-// Socket event listeners
-socket.on('room-created', (data) => {
-    currentRoomId = data.roomId;
-    // Use the actual URL from the browser
-    const actualUrl = window.location.origin + '/room/' + currentRoomId;
-    roomLink.textContent = actualUrl;
-    roomCodeDisplay.textContent = currentRoomId.toLowerCase();
-    startTimer();
+  // Get room info for joiners (for automatic language selection)
+  socket.on('get-room-info', (data) => {
+    const { roomId } = data;
     
-    // Update the browser URL to the new room URL
-    window.history.pushState({}, '', '/room/' + currentRoomId);
-});
-
-socket.on('joined-room', (data) => {
-    currentRoomId = data.roomId;
-    
-    if (data.otherUser) {
-        partnerName.textContent = data.otherUser.username;
-        partnerLanguage = data.otherUser.language;
-        translationLang.textContent = languageNames[partnerLanguage] || partnerLanguage;
-        
-        // Show chat interface
-        roomContainer.style.display = 'none';
-        chatContainer.style.display = 'flex';
+    // Check if room exists
+    if (rooms.has(roomId)) {
+      const room = rooms.get(roomId);
+      
+      // Send room language info to joiner
+      socket.emit('room-info', {
+        creatorLanguage: room.creatorLanguage,
+        partnerLanguage: room.partnerLanguage
+      });
+      
+      console.log(`Sent room info for room: ${roomId}`);
+    } else {
+      socket.emit('error', { message: 'Room not found' });
     }
-});
+  });
 
-socket.on('user-joined', (data) => {
-    partnerName.textContent = data.username;
-    partnerLanguage = data.language;
-    translationLang.textContent = languageNames[partnerLanguage] || partnerLanguage;
+  // Join an existing room
+  socket.on('join-room', (data) => {
+    const { roomId, username, language } = data;
     
-    // Clear timer since room is now full
-    clearInterval(timer);
-    status.innerHTML = '<i class="fas fa-user-check"></i> Partner joined the chat!';
-    status.className = 'status connected';
+    // Check if room exists
+    if (!rooms.has(roomId)) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
     
-    // Add system message
-    addSystemMessage(`${data.username} joined the chat`);
+    const room = rooms.get(roomId);
     
-    // Show chat interface after delay
-    setTimeout(() => {
-        roomContainer.style.display = 'none';
-        chatContainer.style.display = 'flex';
-    }, 1500);
-});
+    // Check if room is full
+    if (room.participants.length >= 2) {
+      socket.emit('error', { message: 'Room is full' });
+      return;
+    }
+    
+    // Clear timeout since room is now full
+    clearTimeout(room.timeout);
+    
+    // Add participant to room (use the language they specified)
+    room.participants.push({
+      id: socket.id,
+      username: username,
+      language: language,
+      joinedAt: new Date()
+    });
+    
+    // Join the room
+    socket.join(roomId);
+    
+    // Notify other participant
+    const otherParticipant = room.participants.find(p => p.id !== socket.id);
+    if (otherParticipant) {
+      io.to(otherParticipant.id).emit('user-joined', {
+        username: username,
+        language: language
+      });
+    }
+    
+    // Send room info to joiner (include the other user's info)
+    socket.emit('joined-room', {
+      roomId,
+      otherUser: otherParticipant ? {
+        username: otherParticipant.username,
+        language: otherParticipant.language
+      } : null
+    });
+    
+    console.log(`User ${username} joined room: ${roomId} with language: ${language}`);
+  });
 
-socket.on('message-received', (data) => {
-    addMessage(
-        data.message,
-        data.translatedMessage,
-        data.username,
-        data.isOwn
+  // Handle sending messages
+  socket.on('send-message', async (data) => {
+    const { roomId, message } = data;
+    
+    // Check if room exists
+    if (!rooms.has(roomId)) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+    
+    const room = rooms.get(roomId);
+    const sender = room.participants.find(p => p.id === socket.id);
+    const receiver = room.participants.find(p => p.id !== socket.id);
+    
+    if (!sender || !receiver) {
+      socket.emit('error', { message: 'Participant not found' });
+      return;
+    }
+    
+    console.log(`Translating message from ${sender.language} to ${receiver.language}`);
+    
+    // Translate message from sender's language to receiver's language
+    const translatedMessage = await translateText(
+      message, 
+      sender.language, 
+      receiver.language
     );
-});
-
-socket.on('room-expired', () => {
-    alert('The chat room has expired. Please create a new room.');
-    redirectToHomepage();
-});
-
-socket.on('user-left', (data) => {
-    addSystemMessage(`${data.username} has left the chat. You can continue waiting for them to return.`);
-});
-
-socket.on('chat-ended', (data) => {
-    addSystemMessage(`${data.username} has ended the chat. The room is now closed.`);
-    setTimeout(() => {
-        alert(`${data.username} has ended the chat. You will be returned to the setup screen.`);
-        redirectToHomepage();
-    }, 2000);
-});
-
-socket.on('return-to-setup', () => {
-    // This is sent to the user who ended the chat
-    redirectToHomepage();
-});
-
-
-// Handle room not found error
-socket.on('error', (data) => {
-    // If it's a room not found error, redirect immediately
-    if (data.type === 'room-not-found') {
-        alert(`Error: ${data.message}`);
-        redirectToHomepage();
-    } else {
-        // For other errors, just show the message
-        alert(`Error: ${data.message}`);
-    }
-});
-
-socket.on('room-info', (data) => {
-    if (data.creatorLanguage && data.partnerLanguage) {
-        console.log('Received room info:', data);
-        autoSelectPartnerLanguage(data.creatorLanguage, data.partnerLanguage);
-    }
-});
-
-// Check if we're joining an existing room
-window.addEventListener('DOMContentLoaded', () => {
-    const path = window.location.pathname;
-    const roomMatch = path.match(/\/room\/([a-zA-Z0-9]+)/);
     
-    if (roomMatch) {
-        // Someone is joining an existing room
-        isJoiningRoom = true;
-        
-        // Show setup for joiner but with different flow
-        welcomeContainer.style.display = 'none';
-        setupContainer.style.display = 'block';
-        document.querySelector('.setup-title').textContent = 'Join Chat Room';
-        document.querySelector('.start-btn').innerHTML = '<i class="fas fa-sign-in-alt"></i> Join Room';
-        
-        // Request room info to get language preferences
-        socket.emit('get-room-info', {
-            roomId: roomMatch[1]
-        });
-    } else {
-        // First visitor - show welcome screen
-        welcomeContainer.style.display = 'flex';
-        setupContainer.style.display = 'none';
-        joinRoomContainer.style.display = 'none';
-        roomContainer.style.display = 'none';
-        chatContainer.style.display = 'none';
-        isJoiningRoom = false;
+    // Emit message to sender (show what they sent)
+    socket.emit('message-received', {
+      message,
+      translatedMessage,
+      username: 'You',
+      timestamp: new Date(),
+      isOwn: true
+    });
+    
+    // Emit message to receiver (show translation in their language)
+    io.to(receiver.id).emit('message-received', {
+      message,
+      translatedMessage,
+      username: sender.username,
+      timestamp: new Date(),
+      isOwn: false
+    });
+  });
+
+  // Handle user ending chat intentionally
+  socket.on('end-chat', (data) => {
+    const { roomId } = data;
+    
+    if (!rooms.has(roomId)) {
+      return;
     }
+    
+    const room = rooms.get(roomId);
+    const participant = room.participants.find(p => p.id === socket.id);
+    
+    if (participant) {
+      // Notify the other participant that this user ended the chat
+      const otherParticipant = room.participants.find(p => p.id !== socket.id);
+      if (otherParticipant) {
+        io.to(otherParticipant.id).emit('chat-ended', {
+          username: participant.username,
+          reason: 'ended'
+        });
+      }
+      
+      // Notify the user who ended the chat to return to setup
+      socket.emit('return-to-setup');
+      
+      // Remove this participant from the room
+      room.participants = room.participants.filter(p => p.id !== socket.id);
+      
+      // If room is now empty, delete it
+      if (room.participants.length === 0) {
+        clearTimeout(room.timeout);
+        rooms.delete(roomId);
+      }
+    }
+    
+    console.log(`User ${participant ? participant.username : 'unknown'} ended chat in room: ${roomId}`);
+  });
+
+  // Handle disconnection (network loss, browser close, etc.)
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+    
+    // Remove user from any rooms they were in
+    for (const [roomId, room] of rooms.entries()) {
+      const participantIndex = room.participants.findIndex(p => p.id === socket.id);
+      
+      if (participantIndex !== -1) {
+        const participant = room.participants[participantIndex];
+        room.participants.splice(participantIndex, 1);
+        
+        // Notify remaining participant that this user left
+        if (room.participants.length > 0) {
+          io.to(room.participants[0].id).emit('user-left', {
+            username: participant.username
+          });
+        }
+        // If room is now empty, delete it
+        else {
+          clearTimeout(room.timeout);
+          rooms.delete(roomId);
+        }
+        
+        console.log(`User ${participant.username} left room: ${roomId}`);
+        break;
+      }
+    }
+  });
 });
 
-// Handle browser back/forward buttons
-window.addEventListener('popstate', function(event) {
-    location.reload();
-});
-
-// Handle page unload (browser close/tab close) - don't send end-chat
-window.addEventListener('beforeunload', function(e) {
-    // Don't notify server when browser closes - just let disconnect handle it
-    // This prevents "ended chat" message when user just closes browser
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  if (!process.env.GROQ_API_KEY) {
+    console.warn('Warning: GROQ_API_KEY not found in environment variables. Translation will not work.');
+  }
 });
