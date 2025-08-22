@@ -314,7 +314,7 @@ socket.on('room-created', (data) => {
     // Use the actual URL from the browser
     const actualUrl = window.location.origin + '/room/' + currentRoomId;
     roomLink.textContent = actualUrl;
-    roomCodeDisplay.textContent = currentRoomId.toUpperCase();
+    roomCodeDisplay.textContent = currentRoomId.toLowerCase();
     startTimer();
     
     // Update the browser URL to the new room URL
